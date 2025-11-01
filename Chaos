@@ -1,0 +1,247 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Compte à rebours + code d'accès</title>
+<style>
+  :root{
+    --bg:#0f1724;
+    --card:#0b1220;
+    --accent:#7dd3fc;
+    --muted:#94a3b8;
+    --success:#34d399;
+    --danger:#fb7185;
+    --glass: rgba(255,255,255,0.03);
+    font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0;
+    min-height:100vh;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    background: linear-gradient(180deg,#071024 0%, #0b1220 100%);
+    color:#e6eef8;
+    padding:24px;
+  }
+  .card{
+    width:100%;
+    max-width:520px;
+    background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+    border-radius:14px;
+    padding:28px;
+    box-shadow: 0 10px 30px rgba(2,6,23,0.6);
+    border:1px solid rgba(255,255,255,0.03);
+  }
+
+  h1{margin:0 0 6px 0; font-size:20px; letter-spacing:0.2px}
+  p.lead{margin:0 0 18px 0; color:var(--muted); font-size:14px}
+
+  .timer{
+    display:flex;
+    gap:12px;
+    align-items:center;
+    margin-bottom:18px;
+  }
+  .time-box{
+    background:var(--glass);
+    padding:10px 14px;
+    border-radius:10px;
+    min-width:92px;
+    text-align:center;
+    border:1px solid rgba(125,211,252,0.08);
+  }
+  .time-value{font-size:22px; font-weight:700; color:var(--accent)}
+  .time-label{font-size:12px; color:var(--muted); margin-top:4px}
+
+  .status{
+    margin-bottom:18px;
+    font-size:14px;
+    color:var(--muted);
+  }
+
+  .controls{
+    display:flex;
+    gap:8px;
+    align-items:center;
+    margin-bottom:18px;
+  }
+  input[type="text"]{
+    flex:1;
+    padding:10px 12px;
+    border-radius:10px;
+    border:1px solid rgba(255,255,255,0.04);
+    background:rgba(255,255,255,0.02);
+    color:var(--accent);
+    font-weight:600;
+    outline:none;
+    box-shadow:inset 0 -6px 10px rgba(0,0,0,0.35);
+  }
+  button{
+    padding:10px 14px;
+    border-radius:10px;
+    border:0;
+    background:linear-gradient(180deg,var(--accent), #60cffa);
+    color:#012;
+    font-weight:700;
+    cursor:pointer;
+    box-shadow: 0 6px 18px rgba(125,211,252,0.12);
+  }
+  button:disabled{opacity:0.45; cursor:not-allowed; filter:grayscale(0.2)}
+
+  .message{font-size:14px; margin-bottom:14px}
+  .message.success{color:var(--success)}
+  .message.error{color:var(--danger)}
+
+  .reveal{
+    margin-top:12px;
+    display:none;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    gap:16px;
+  }
+  .reveal .secret-text{
+    font-size: 1.5em;
+    color: #fff;
+    /* plus de fond ni de padding ni de bordure */
+    font-weight: bold;
+    margin-top: 12px;
+    text-align: center;
+  }
+
+  @media (max-width:480px){
+    .time-box{min-width:72px}
+    .time-value{font-size:18px}
+    .reveal .secret-text{font-size:1em;}
+  }
+</style>
+</head>
+<body>
+  <div class="card" role="main" aria-labelledby="title">
+    <h1 id="title">Accès protégé 
+    </h1>
+    <p class="lead">Sécurité</p>
+
+    <div class="timer" aria-hidden="false">
+      <div class="time-box">
+        <div class="time-value" id="minutes">01</div>
+        <div class="time-label">Minutes</div>
+      </div>
+      <div class="time-box">
+        <div class="time-value" id="seconds">00</div>
+        <div class="time-label">Secondes</div>
+      </div>
+    </div>
+
+    <!-- Le texte "Temps restant : ..." a été supprimé -->
+
+    <div class="controls" id="controls" aria-hidden="true" style="display:none;">
+      <input id="codeInput" type="text" inputmode="numeric" maxlength="10" placeholder="Entrez le code" aria-label="Champ code">
+      <button id="submitBtn" type="button">Valider</button>
+    </div>
+
+    <div class="message" id="message" aria-live="polite"></div>
+
+    <div class="reveal" id="reveal">
+      <div class="secret-text">mange ma bite</div>
+    </div>
+  </div>
+
+<script>
+(function(){
+  // Durée du compte à rebours (en millisecondes)
+  const DURATION_MS = 1 * 60 * 1000; // 1 minute
+
+  // Elements
+  const minutesEl = document.getElementById('minutes');
+  const secondsEl = document.getElementById('seconds');
+  const controls = document.getElementById('controls');
+  const message = document.getElementById('message');
+  const reveal = document.getElementById('reveal');
+  const codeInput = document.getElementById('codeInput');
+  const submitBtn = document.getElementById('submitBtn');
+
+  // Calcul du temps final (au chargement)
+  const endTime = Date.now() + DURATION_MS;
+
+  // Met à jour l'affichage du minuteur
+  function updateTimer(){
+    const now = Date.now();
+    let diff = endTime - now;
+    if (diff < 0) diff = 0;
+    const minutes = Math.floor(diff / 60000);
+    const seconds = Math.floor((diff % 60000) / 1000);
+
+    // Affichage avec deux chiffres
+    minutesEl.textContent = String(minutes).padStart(2,'0');
+    secondsEl.textContent = String(seconds).padStart(2,'0');
+
+    if (diff === 0) {
+      // stop interval handled by caller
+      onTimerEnd();
+    }
+  }
+
+  // Ce qui se passe quand le timer arrive à zéro
+  function onTimerEnd(){
+    controls.style.display = 'flex';
+    controls.setAttribute('aria-hidden', 'false');
+    codeInput.focus();
+    message.textContent = '';
+  }
+
+  // Vérifie le code
+  function checkCode(){
+    const code = codeInput.value.trim();
+    if (!code){
+      showMessage('Veuillez entrer un code.', 'error');
+      return;
+    }
+    if (code === '1111') {
+      showMessage('Code correct — accès autorisé ✔️', 'success');
+      reveal.style.display = 'flex';
+      // masquer le champ et le bouton une fois validé
+      controls.style.display = 'none';
+    } else {
+      showMessage('Code incorrect. Réessaie.', 'error');
+      // petite animation visuelle (shake)
+      controls.animate([
+        { transform: 'translateX(0)' },
+        { transform: 'translateX(-8px)' },
+        { transform: 'translateX(8px)' },
+        { transform: 'translateX(0)' }
+      ], { duration: 300 });
+      codeInput.select();
+    }
+  }
+
+  // affiche message
+  function showMessage(text, type){
+    message.className = 'message ' + (type === 'success' ? 'success' : 'error');
+    message.textContent = text;
+  }
+
+  // Lancement du timer
+  updateTimer();
+  const intervalId = setInterval(function(){
+    updateTimer();
+    if (Date.now() >= endTime) {
+      clearInterval(intervalId);
+    }
+  }, 250);
+
+  // Gère le bouton et Enter
+  submitBtn.addEventListener('click', checkCode);
+  codeInput.addEventListener('keydown', function(e){
+    if (e.key === 'Enter') checkCode();
+  });
+
+  // Pour l'accessibilité : empêcher le navigateur d'autocompléter avec autre chose
+  codeInput.autocomplete = 'off';
+})();
+</script>
+</body>
+</html>
